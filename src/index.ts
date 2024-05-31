@@ -1,21 +1,24 @@
-import { tools, Reader } from 'ts-ebml';
-import LargeFileDecorder from './decoder';
+import { tools, Reader } from "ts-ebml";
+import LargeFileDecorder from "./decoder";
 
 /**
  * fix webm media file without 2GB filesize limit
- * 
+ *
  * @param the blob you need to fix
  * @returns the blob that has been fixed
- * 
+ *
  * using this function can not only add "Duration" but also add "SeekHead", "Seek", "SeekID", "SeekPosition" for the webm
- * if a webm loss "SeekHead", "Seek", "SeekID", "SeekPosition" and "Cues", "CueTime", "CueTrack", "CueClusterPosition", "CueTrackPositions", "CuePoint",  
+ * if a webm loss "SeekHead", "Seek", "SeekID", "SeekPosition" and "Cues", "CueTime", "CueTrack", "CueClusterPosition", "CueTrackPositions", "CuePoint",
  * then the webm will not seekable when playing in chrome with builtin <video> tag
  * that means only when all webm is donwloaded then user can seek location
  * now with the help of ts-ebml library, this issue solved by recalculate metadata
  * however ts-ebml doesn't support large file larger than 2 GB
  *
  */
-export default async function fixWebmMetaInfo(blob: Blob): Promise<Blob> {
+export default async function fixWebmMetaInfo(
+  blob: Blob,
+  duration: number
+): Promise<Blob> {
   const decoder = new LargeFileDecorder();
   const reader = new Reader();
   reader.logging = false;
@@ -32,19 +35,30 @@ export default async function fixWebmMetaInfo(blob: Blob): Promise<Blob> {
     blobSlices.push(slice);
   }
 
-  decoder.decode(bufSlices).forEach(elm => reader.read(elm));
+  decoder.decode(bufSlices).forEach((elm) => reader.read(elm));
   reader.stop();
 
-  const refinedMetadataBuf = tools.makeMetadataSeekable(reader.metadatas, reader.duration, reader.cues);
-  const refinedMetadataBlob = new Blob([refinedMetadataBuf], { type: blob.type });
+  const refinedMetadataBuf = tools.makeMetadataSeekable(
+    reader.metadatas,
+    duration || reader.duration,
+    reader.cues
+  );
+  const refinedMetadataBlob = new Blob([refinedMetadataBuf], {
+    type: blob.type,
+  });
 
   const firstPartBlobSlice = blobSlices.shift();
-  const firstPartBlobWithoutMetadata = firstPartBlobSlice!.slice(reader.metadataSize);  
+  const firstPartBlobWithoutMetadata = firstPartBlobSlice!.slice(
+    reader.metadataSize
+  );
   // using Blob instead of ArrayBuffer to construct the new Blob, to minify memory leak
-  const finalBlob = new Blob([refinedMetadataBlob, firstPartBlobWithoutMetadata, ...blobSlices], { type: blob.type });
+  const finalBlob = new Blob(
+    [refinedMetadataBlob, firstPartBlobWithoutMetadata, ...blobSlices],
+    { type: blob.type }
+  );
 
   bufSlices = [];
   blobSlices = [];
-  
+
   return finalBlob;
 }

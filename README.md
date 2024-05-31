@@ -1,49 +1,50 @@
-# fix-webm-metainfo
+# webm-metainfo-fix
 
 This is a lib based on ts-ebml and support large file (>2GB) that ts-ebml not supported
 
 Using this function can not only add "Duration" but also add "SeekHead", "Seek", "SeekID", "SeekPosition" and "Cues", "CueTime", "CueTrack", "CueClusterPosition", "CueTrackPositions", "CuePoint" for a webm file
+
 ## Usage
 
 ```typescript
-import fixWebmMetaInfo from 'fix-webm-metainfo';
+import fixWebmMetaInfo from "webm-metainfo-fix";
 
 // please use h264 to enable hardware encode accelerate and decrease cpu usage
-const mimeType = 'video/webm\;codecs=h264';
+const mimeType = "video/webm;codecs=h264";
 const blobSlice: BlobPart[] = [];
 
 mediaRecorder = new MediaRecorder(stream, {
   mimeType,
-  videoBitsPerSecond: 1e6
+  videoBitsPerSecond: 1e6,
 });
 
 mediaRecorder.ondataavailable = (event: BlobEvent) => {
   blobSlice.push(event.data);
-}
+};
 
 mediaRecorder.onstop = async () => {
   // support fix webm files larger than 2GB
-  const fixedWebMBlob = await fixWebmMetaInfo(new Blob([...blobSlice], { type: mimeType }));
+  const fixedWebMBlob = await fixWebmMetaInfo(
+    new Blob([...blobSlice], { type: mimeType }),
+    duration
+  );
   blobSlice = [];
 };
 
 // using timeslice to avoid memory consumption in renderer process, and generate a blob object each second
 mediaRecorder.start(1000);
 setTimeout(() => mediaRecorder.stop(), 5000); // generate 5 blob slices
-
 ```
 
 ## Release Note
 
 ```
-v1.0.8:
+fix: Custom duration
+
 fix: update webm matroska-schema to V4 version
 
-v1.0.6:
 fix: using Blob instead of ArrayBuffer to fix recreate webm issue and solving memory leak
 
-v1.0.5
-feat: initial commit
 ```
 
 ## Tips for using this library
@@ -71,7 +72,7 @@ const float kDefaultMaxBlobInMemorySpaceUnderPressureRatio = 0.002f;
 
 ##### What is the maximum record file size?
 
-According to the chromium blob implention, this value equals to Math.min(software located disk partition size * / 10, free disk space), so if your C:\ partition is 128GB, the max record size is 12.8GB, even if you have 100GB free space.
+According to the chromium blob implention, this value equals to Math.min(software located disk partition size \* / 10, free disk space), so if your C:\ partition is 128GB, the max record size is 12.8GB, even if you have 100GB free space.
 
 ##### how to get rid of the limit of record file size?
 
@@ -119,6 +120,7 @@ if (memory_size > 0) {
 ```
 
 ## What is the current limit of this library
+
 1. using web worker to decrease thread crimp (already implement, will suport later)
 2. decrease runtime fix memory consumption
 3. support non-node enviroment fixup
